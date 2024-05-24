@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Viewer</title>
+  <meta charset="utf-8" />
+</head>
+<body>
+<p>Viewer</p>
+
+<!--Add buttons to initiate auth sequence and sign out-->
+<button id="authorize_button" onclick="handleAuthClick()">Authorize</button>
+<button id="signout_button" onclick="handleSignoutClick()">Sign Out</button>
+
+<pre id="content" style="white-space: pre-wrap;"></pre>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js"></script>
+<script type="text/javascript">
+  /* exported gapiLoaded */
+  /* exported gisLoaded */
+  /* exported handleAuthClick */
+  /* exported handleSignoutClick */
+
+  // Authorization scopes required by the API; multiple scopes can be
+  // included, separated by spaces.
+  const SCOPES = 'https://www.googleapis.com/auth/drive';
+
+  const CLIENT_ID = '<>';
+  const API_KEY = '<>';
+
+  const APP_ID = '<> ';
+
+  let tokenClient;
+  let accessToken = null;
+  let gisInited = false;
+
+
+  document.getElementById('authorize_button').style.visibility = 'hidden';
+  document.getElementById('signout_button').style.visibility = 'hidden';
+
+  function gapiLoaded() {
+    gapi.load('client', function() { gapi.client.load('drive', 'v3', function() {}); });
+  }
+
+
+  /**
+   * Callback after Google Identity Services are loaded.
+   */
+  function gisLoaded() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: '', // defined later
+    });
+    gisInited = true;
+    maybeEnableButtons();
+  }
+
+  /**
+   * Enables user interaction after all libraries are loaded.
+   */
+  function maybeEnableButtons() {
+    if (gisInited) {
+      document.getElementById('authorize_button').style.visibility = 'visible';
+    }
+  }
+
+  /**
+   *  Sign in the user upon button click.
+   */
+  function handleAuthClick() {
+    tokenClient.callback = async (response) => {
+      if (response.error !== undefined) {
+        throw (response);
+      }
+      accessToken = response.access_token;
+      document.getElementById('signout_button').style.visibility = 'visible';
+      document.getElementById('authorize_button').innerText = 'Refresh';
+      createViewer();
+    };
+
+    if (accessToken === null) {
+      // Prompt the user to select a Google Account and ask for consent to share their data
+      // when establishing a new session.
+      tokenClient.requestAccessToken({prompt: 'consent'});
+    } else {
+      // Skip display of account chooser and consent dialog for an existing session.
+      tokenClient.requestAccessToken({prompt: ''});
+    }
+  }
+
+  /**
+   *  Sign out the user upon button click.
+   */
+  function handleSignoutClick() {
+    if (accessToken) {
+      accessToken = null;
+      google.accounts.oauth2.revoke(accessToken);
+      document.getElementById('content').innerText = '';
+      document.getElementById('authorize_button').innerText = 'Authorize';
+      document.getElementById('signout_button').style.visibility = 'hidden';
+    }
+  }
+
+  function createViewer() {
+    const res = gapi.client.drive.files.get({
+        'fileId': '{{ file_id }}',
+        'fields': '*',
+      });
+    res.then(response => {
+      console.log(response);
+      window.document.getElementById('content').innerText = `Drive API response for first document: \n${JSON.stringify(response.result, null, 2)}\n`;;
+    });
+  }
+</script>
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+</body>
+</html>
